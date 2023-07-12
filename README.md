@@ -25,6 +25,8 @@ We hope you enjoy!
 > run this command to install all the required packages 
   
   ```pip3 install -r requirements.txt```
+- you may need to run the following command to install the right **scipy** version
+```python3 -m pip install scipy==1.9.3```
 - New Relic instrumentation
   - Update the newrelic.ini file by replacing INSERT_YOUR_INGEST_LICENSE_KEY_HERE with your account's [ingest license key](https://docs.newrelic.com/docs/apis/intro-apis/new-relic-api-keys/).
   - To see your game stats on a New Relic dashboard edit the game_stats.json file by doing a global search and replace to substitute "YOUR_ACCOUNT_ID" with your 7-digit [account ID](https://docs.newrelic.com/docs/accounts/accounts-billing/account-structure/account-id/). 
