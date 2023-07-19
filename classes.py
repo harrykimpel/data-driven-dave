@@ -137,19 +137,19 @@ class Screen(object):
 
     def printMap(self, map, tileset):
         # This creates a new span that's the child of the current one
-        with tracer.start_as_current_span("printMap") as rollspan:
-            for y, row in enumerate(map.getNodeMatrix()):
-                for x, col in enumerate(row):
-                    tile = map.getNode(x, y)
-                    absolute_y = y * HEIGHT_OF_MAP_NODE
+        # with tracer.start_as_current_span("printMap", None, trace.SpanKind.SERVER) as printMapSpan:
+        for y, row in enumerate(map.getNodeMatrix()):
+            for x, col in enumerate(row):
+                tile = map.getNode(x, y)
+                absolute_y = y * HEIGHT_OF_MAP_NODE
 
-                    # won't print other tiles that aren't in the game screen (considering the current x position)
-                    if self.isXInScreen(x):
-                        adjusted_x = x - self.x_pos  # print the tile accordingly to the screen shift
-                        absolute_x = adjusted_x * WIDTH_OF_MAP_NODE  # store the x pos in pixels
-                        tile_graphic = tile.getGraphic(
-                            tileset)  # get the tile graphic
-                        self.printTile(absolute_x, absolute_y, tile_graphic)
+                # won't print other tiles that aren't in the game screen (considering the current x position)
+                if self.isXInScreen(x):
+                    adjusted_x = x - self.x_pos  # print the tile accordingly to the screen shift
+                    absolute_x = adjusted_x * WIDTH_OF_MAP_NODE  # store the x pos in pixels
+                    tile_graphic = tile.getGraphic(
+                        tileset)  # get the tile graphic
+                    self.printTile(absolute_x, absolute_y, tile_graphic)
 
     def printPlayer(self, player, player_x, player_y, tileset):
         player_graphic = player.getGraphic(tileset)
@@ -1451,29 +1451,38 @@ class Player(Dynamic):
             self.setFallingState()
 
     def collectItem(self, item_pos, level):
-        x = item_pos[0]
-        y = item_pos[1]
+        with tracer.start_as_current_span("collectItem", None, trace.SpanKind.SERVER) as collectItemSpan:
+            x = item_pos[0]
+            y = item_pos[1]
 
-        item = level.getNode(x, y)
+            item = level.getNode(x, y)
 
-        itemIsEquipment = False
-        # if the item is an equipment, add it to the inventory
-        if isinstance(item, Equipment):
-            itemIsEquipment = True
-            self.inventory[item.getId()] = 1
+            itemIsEquipment = False
+            # if the item is an equipment, add it to the inventory
+            if isinstance(item, Equipment):
+                itemIsEquipment = True
+                self.inventory[item.getId()] = 1
 
-        # increment score
-        self.score += item.getScore()
+            # increment score
+            self.score += item.getScore()
 
-        event_type = "CollectedItem"
-        params = {'item.id': item.getId(), 'item.score': item.getScore(), 'item.type': item.getType(),
-                  'item.isEquipment': itemIsEquipment, 'levelNumber': self.currentLevelNumber, 'item.gfx_id': self.gfx_id}
+            event_type = "CollectedItem"
+            params = {'item.id': item.getId(), 'item.score': item.getScore(), 'item.type': item.getType(),
+                      'item.isEquipment': itemIsEquipment, 'levelNumber': self.currentLevelNumber, 'item.gfx_id': self.gfx_id}
+            collectItemSpan.set_attribute(
+                "item.id", item.getId())
+            collectItemSpan.set_attribute(
+                "item.score", item.getScore())
+            collectItemSpan.set_attribute(
+                "collected_item_type", item.getType())
+            collectItemSpan.set_attribute(
+                "collected_item_isEquipment", itemIsEquipment)
 
-        # if the player got to a certain score, give one life to him
-        if self.score % 5000 == 0:
-            self.giveLife()
+            # if the player got to a certain score, give one life to him
+            if self.score % 5000 == 0:
+                self.giveLife()
 
-        level.clearNode(x, y)
+            level.clearNode(x, y)
 
     def interactWithScenery(self, element_pos, level):
         x = element_pos[0]

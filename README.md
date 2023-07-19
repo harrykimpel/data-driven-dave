@@ -35,6 +35,25 @@ We hope you enjoy!
 - You can run either of the main python scripts located at the root of the repository: `python3 main_oo.py` or `python3 main_fun.py`. This should start the game immediately.
 - Only main_fun.py has been instrumented to send data to New Relic.
 
+## Running the program with OpenTelemetry instrumentation
+
+```shell
+export NEW_RELIC_LICENSE_KEY=<YOUR_NEW_RELIC_LICENSE_KEY>
+export OTEL_EXPORTER_OTLP_HEADERS=api-key=${NEW_RELIC_LICENSE_KEY}
+
+pip3 install -r requirements.txt
+
+opentelemetry-bootstrap -a install
+
+opentelemetry-instrument \
+    --traces_exporter otlp \
+    --metrics_exporter otlp \
+    --logs_exporter otlp \
+    --service_name data-driven-dave \
+    --exporter_otlp_endpoint https://otlp.nr-data.net:4317 \
+    python3 main_fun.py
+``````
+
 ## Misc
 
 - The project is almost a identical replica - the only thing that wasn't implemented was the enemies, due to the project's deadline.
