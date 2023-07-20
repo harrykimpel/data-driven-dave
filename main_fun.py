@@ -328,6 +328,8 @@ def main():
                                     params = {'current_level': current_level_number,
                                               'player_score': GamePlayer.score}
                                     gamePlaySpan.set_attribute(
+                                        "game_complete", 1)
+                                    gamePlaySpan.set_attribute(
                                         "current_level", current_level_number)
                                     gamePlaySpan.set_attribute(
                                         "player_score", GamePlayer.score)
