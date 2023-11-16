@@ -25,7 +25,6 @@ games_played = meter.create_counter(
     description="The number of games played",
 )
 
-
 def showTitleScreen(screen, tileset, ui_tiles):
 
     # This creates a new span that's the child of the current one
