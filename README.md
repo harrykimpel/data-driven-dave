@@ -26,9 +26,13 @@ We hope you enjoy!
   - opentelemetry-distro (e.g. `pip3 install opentelemetry-distro`)
   - opentelemetry-exporter-otlp (e.g. `pip3 install opentelemetry-exporter-otlp`)
 
-> run this command to install all the required packages
-  
-  ```pip3 install -r requirements.txt```
+  Run these commands to install all the required packages in a virtual environment:
+
+    ```shell
+    python3 -m venv .venv
+    source .venv/bin/activate
+    pip3 install -r requirements.txt
+    ```
 
 - New Relic instrumentation
   - To see your game stats on a New Relic dashboard edit the game_stats.json file by doing a global search and replace to substitute "YOUR_ACCOUNT_ID" with your 7-digit [account ID](https://docs.newrelic.com/docs/accounts/accounts-billing/account-structure/account-id/).

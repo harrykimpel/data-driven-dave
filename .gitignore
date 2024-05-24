@@ -1,7 +1,10 @@
 # Virtual Environment
 dd_venv/
 env/
+.venv/
 
 # OS generated files
 .idea/
 *.pyc
+
+__pycache__/
