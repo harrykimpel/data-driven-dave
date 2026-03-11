@@ -1,15 +1,15 @@
+import random
+import logging
+import time
+from functional import *
+from classes import *
 import newrelic.agent
 newrelic.agent.initialize('newrelic.ini')  # This is required! [RLF]
-import nltk
-import langchain
-from classes import *
-from functional import *
-import logging
-import random
 
 '''
 Interpic
 '''
+
 
 @newrelic.agent.background_task()
 def showTitleScreen(screen, tileset, ui_tiles):
@@ -283,9 +283,25 @@ def main():
             # level processing controller
             ended_level = False
 
+            # Fixed timestep: game logic runs at exactly 100 ticks/sec
+            TICK_RATE = 100
+            TICK_TIME = 1.0 / TICK_RATE
+            last_time = time.perf_counter()
+            accumulator = 0.0
+
             # Level processing
             while not ended_level:
 
+                # Accumulate elapsed real time
+                now = time.perf_counter()
+                frame_time = now - last_time
+                last_time = now
+                # Cap accumulator to avoid spiral of death (e.g. after window drag)
+                if frame_time > 0.1:
+                    frame_time = 0.1
+                accumulator += frame_time
+
+                # Process input once per display frame (events must be polled regularly)
                 # get keys (inventory)
                 for event in pygame.event.get():
                     # stop moving
@@ -331,58 +347,66 @@ def main():
                         key_map[i] = 1
                 GamePlayer.movementInput(key_map)
 
-                # update the player position in the level and treat collisions
-                if GamePlayer.getCurrentState() != STATE.DESTROY:
-                    (player_position_x, player_position_y) = GamePlayer.updatePosition(
-                        player_position_x, player_position_y, Level, game_screen.getUnscaledHeight())
+                # Run game logic at fixed 200 ticks/sec
+                while accumulator >= TICK_TIME and not ended_level:
 
-                # update friendly shot position, if there is one
-                if friendly_shot:
-                    friendly_shot_x = friendly_shot.updatePosition(
-                        friendly_shot_x, friendly_shot_y, Level)
-                    if (friendly_shot_x == -1):
-                        del friendly_shot
-                        friendly_shot = 0
+                    # update the player position in the level and treat collisions
+                    if GamePlayer.getCurrentState() != STATE.DESTROY:
+                        (player_position_x, player_position_y) = GamePlayer.updatePosition(
+                            player_position_x, player_position_y, Level, game_screen.getUnscaledHeight())
 
-                # if the player ended the level, go on to the next
-                if GamePlayer.getCurrentState() == STATE.ENDMAP:
-                    ended_level = True
+                    # update friendly shot position, if there is one
+                    if friendly_shot:
+                        friendly_shot_x = friendly_shot.updatePosition(
+                            friendly_shot_x, friendly_shot_y, Level)
+                        if (friendly_shot_x == -1):
+                            del friendly_shot
+                            friendly_shot = 0
+
+                    # if the player ended the level, go on to the next
+                    if GamePlayer.getCurrentState() == STATE.ENDMAP:
+                        ended_level = True
+                        break
+                    # if the player died, spawn death puff and respawn player (if he has enough lives)
+                    elif GamePlayer.getCurrentState() == STATE.DESTROY:
+                        if death_timer == -1:
+                            GamePlayer.takeLife()
+                            DeathPuff = AnimatedTile("explosion", 0)
+                            death_timer = 120
+
+                        player_position_y += 0.25
+                        death_timer -= 1
+
+                        if death_timer == 0:
+                            death_timer = -1
+                            game_screen.setXPosition(Level.getPlayerSpawnerPosition(
+                                current_spawner_id)[0] - 10, Level.getWidth())
+                            del DeathPuff
+
+                            if (GamePlayer.resetPosAndState() != -1):
+                                (player_position_x, player_position_y) = Level.getPlayerSpawnerPosition(
+                                    current_spawner_id)
+                                player_position_x *= WIDTH_OF_MAP_NODE
+                                player_position_y *= HEIGHT_OF_MAP_NODE
+                            else:
+                                ended_level = True
+                                ended_game = True
+
+                                # Write game stats to log [RLF]
+                                logging.info(
+                                    'Game ended with score %s', GamePlayer.score)
+
+                                # Record custom New Relic event [RLF]
+                                event_type = "GameComplete"
+                                params = {'current_level': current_level_number,
+                                          'player_score': GamePlayer.score}
+                                newrelic.agent.record_custom_event(
+                                    event_type, params, application=application)
+
+                    accumulator -= TICK_TIME
+
+                if ended_level:
                     break
-                # if the player died, spawn death puff and respawn player (if he has enough lives)
-                elif GamePlayer.getCurrentState() == STATE.DESTROY:
-                    if death_timer == -1:
-                        GamePlayer.takeLife()
-                        DeathPuff = AnimatedTile("explosion", 0)
-                        death_timer = 120
-
-                    player_position_y += 0.25
-                    death_timer -= 1
-
-                    if death_timer == 0:
-                        death_timer = -1
-                        game_screen.setXPosition(Level.getPlayerSpawnerPosition(
-                            current_spawner_id)[0] - 10, Level.getWidth())
-                        del DeathPuff
-
-                        if (GamePlayer.resetPosAndState() != -1):
-                            (player_position_x, player_position_y) = Level.getPlayerSpawnerPosition(
-                                current_spawner_id)
-                            player_position_x *= WIDTH_OF_MAP_NODE
-                            player_position_y *= HEIGHT_OF_MAP_NODE
-                        else:
-                            ended_level = True
-                            ended_game = True
-
-                            # Write game stats to log [RLF]
-                            logging.info(
-                                'Game ended with score %s', GamePlayer.score)
-
-                            # Record custom New Relic event [RLF]
-                            event_type = "GameComplete"
-                            params = {'current_level': current_level_number,
-                                      'player_score': GamePlayer.score}
-                            newrelic.agent.record_custom_event(
-                                event_type, params, application=application)
 
                 # if the player is close enough to one of the screen boundaries, move the screen.
                 player_close_to_left_boundary = (
@@ -448,8 +472,6 @@ def main():
 
                 pygame.display.flip()
                 pygame.event.pump()
-                clock.tick(200)
-
             # Record custom New Relic event [RLF]
             event_type = "LevelUp"
             params = {'current_level': current_level_number,
